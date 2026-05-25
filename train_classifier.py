@@ -71,10 +71,11 @@ def preprocess_audio_for_model(audio_path, sample_rate=32000, n_fft=1024,
 
 # ========== 数据集类 ==========
 class ESC50Dataset(Dataset):
-    def __init__(self, metadata, class_to_idx, esc50_path):
+    def __init__(self, metadata, class_to_idx, esc50_path, is_training=True):
         self.metadata = metadata
         self.class_to_idx = class_to_idx
         self.audio_dir = os.path.join(esc50_path, 'audio')
+        self.is_training = is_training  # 新增：区分训练集和验证集
 
     def __len__(self):
         return len(self.metadata)
@@ -83,6 +84,50 @@ class ESC50Dataset(Dataset):
         row = self.metadata.iloc[idx]
         audio_path = os.path.join(self.audio_dir, row['filename'])
         
+         # 加载音频
+        y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
+        
+        # 统一长度到 5 秒
+        target_len = 5 * SAMPLE_RATE
+        if len(y) < target_len:
+            y = np.pad(y, (0, target_len - len(y)))
+        else:
+            y = y[:target_len]
+
+        # ========== 数据增强（只在训练时做）==========
+        if self.is_training:
+            # 1. 加高斯噪声（模拟背景噪音）
+            noise_level = np.random.uniform(0, 0.01)  # 随机噪声强度
+            noise = np.random.randn(len(y)) * noise_level
+            y = y + noise
+            
+            # 2. 时间拉伸（随机 0.9-1.1 倍速）
+            stretch_rate = np.random.uniform(0.9, 1.1)
+            y = librosa.effects.time_stretch(y, rate=stretch_rate)
+            
+            # 3. 音高偏移（随机 ±2 个半音）
+            n_steps = np.random.randint(-2, 3)
+            y = librosa.effects.pitch_shift(y, sr=sr, n_steps=n_steps)
+            
+            # 4. 音量调整（随机 0.7-1.3 倍）
+            volume_gain = np.random.uniform(0.7, 1.3)
+            y = y * volume_gain
+        # ========================================
+        
+        # 计算梅尔频谱
+        mel_spec = librosa.feature.melspectrogram(
+            y=y, sr=sr, n_fft=N_FFT, 
+            hop_length=HOP_LENGTH, n_mels=N_MELS, 
+            fmin=FMIN, fmax=FMAX
+        )
+        
+        # 转换为对数刻度（dB）
+        log_mel = librosa.power_to_db(mel_spec, ref=np.max)
+        
+        # 调整形状： (freq, time) -> (time, freq) -> (1, time, freq)
+        log_mel = log_mel.T
+        log_mel = log_mel[np.newaxis, :, :]
+
         # 调用预处理函数，得到 numpy 数组，形状 (1, time, freq)
         log_mel_numpy = preprocess_audio_for_model(
             audio_path, SAMPLE_RATE, N_FFT, 
@@ -96,8 +141,8 @@ class ESC50Dataset(Dataset):
         return log_mel, label
 
 # 创建数据集和数据加载器
-train_dataset = ESC50Dataset(train_meta, class_to_idx, ESC50_PATH)
-val_dataset = ESC50Dataset(val_meta, class_to_idx, ESC50_PATH)
+train_dataset = ESC50Dataset(train_meta, class_to_idx, ESC50_PATH, is_training=True)
+val_dataset = ESC50Dataset(val_meta, class_to_idx, ESC50_PATH, is_training=False)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
@@ -142,7 +187,6 @@ if os.path.exists(checkpoint_path):
             print("✅ Successfully loaded pretrained weights!")
 
 # ========== 冻结/解冻设置 ==========
-# 先冻结所有
 for param in model.parameters():
     param.requires_grad = True
 

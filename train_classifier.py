@@ -144,24 +144,20 @@ if os.path.exists(checkpoint_path):
 # ========== 冻结/解冻设置 ==========
 # 先冻结所有
 for param in model.parameters():
-    param.requires_grad = False
-
-# 解冻 conv_block3 和 conv_block4
-for param in model.conv_block3.parameters():
-    param.requires_grad = True
-for param in model.conv_block4.parameters():
-    param.requires_grad = True
-
-# 解冻分类层
-for param in model.fc1.parameters():
-    param.requires_grad = True
-for param in model.fc_audioset.parameters():
     param.requires_grad = True
 
 print(f"\nTrainable params: {[n for n, p in model.named_parameters() if p.requires_grad]}")
 
 # ========== 优化器和损失函数 ==========
-optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+# 不同层使用不同学习率
+optimizer = optim.Adam([
+    {'params': model.conv_block1.parameters(), 'lr': 1e-5},   # 底层：最小学习率
+    {'params': model.conv_block2.parameters(), 'lr': 1e-5},   # 底层：最小学习率
+    {'params': model.conv_block3.parameters(), 'lr': 5e-5},   # 中层：中等学习率
+    {'params': model.conv_block4.parameters(), 'lr': 1e-4},   # 高层：较大学习率
+    {'params': model.fc1.parameters(), 'lr': 1e-3},           # 分类层：最大学习率
+    {'params': model.fc_audioset.parameters(), 'lr': 1e-3},
+], lr=1e-4)  # 默认学习率作为后备
 criterion = nn.CrossEntropyLoss()
 
 # ========== 训练 ==========

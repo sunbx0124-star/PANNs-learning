@@ -5,3 +5,10 @@
 data/
 resources/
 .DS_Store
+*.pth
+*.wav
+*.mp3
+*.m4a
+data/
+resources/
+.DS_Store

@@ -87,13 +87,6 @@ class ESC50Dataset(Dataset):
         
          # 加载音频
         y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
-        
-        # 统一长度到 5 秒
-        target_len = 5 * SAMPLE_RATE
-        if len(y) < target_len:
-            y = np.pad(y, (0, target_len - len(y)))
-        else:
-            y = y[:target_len]
 
         # ========== 数据增强（只在训练时做）==========
         if self.is_training:
@@ -110,6 +103,13 @@ class ESC50Dataset(Dataset):
             volume_gain = np.random.uniform(0.7, 1.3)
             y = y * volume_gain
         # ========================================
+
+         # 统一长度到 5 秒
+        target_len = 5 * SAMPLE_RATE
+        if len(y) < target_len:
+            y = np.pad(y, (0, target_len - len(y)))
+        else:
+            y = y[:target_len]
         
         # 计算梅尔频谱
         mel_spec = librosa.feature.melspectrogram(

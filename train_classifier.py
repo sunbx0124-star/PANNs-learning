@@ -106,11 +106,7 @@ class ESC50Dataset(Dataset):
             stretch_rate = np.random.uniform(0.9, 1.1)
             y = librosa.effects.time_stretch(y, rate=stretch_rate)
             
-            # 3. 音高偏移（随机 ±2 个半音）
-            n_steps = np.random.randint(-2, 3)
-            y = librosa.effects.pitch_shift(y, sr=sr, n_steps=n_steps)
-            
-            # 4. 音量调整（随机 0.7-1.3 倍）
+            # 3. 音量调整（随机 0.7-1.3 倍）
             volume_gain = np.random.uniform(0.7, 1.3)
             y = y * volume_gain
         # ========================================
@@ -128,15 +124,9 @@ class ESC50Dataset(Dataset):
         # 调整形状： (freq, time) -> (time, freq) -> (1, time, freq)
         log_mel = log_mel.T
         log_mel = log_mel[np.newaxis, :, :]
-
-        # 调用预处理函数，得到 numpy 数组，形状 (1, time, freq)
-        log_mel_numpy = preprocess_audio_for_model(
-            audio_path, SAMPLE_RATE, N_FFT, 
-            HOP_LENGTH, N_MELS, FMIN, FMAX
-        )
         
         # 转换为 Tensor
-        log_mel = torch.from_numpy(log_mel_numpy).float()
+        log_mel = torch.from_numpy(log_mel).float()
         
         label = self.class_to_idx[row['category']]
         return log_mel, label

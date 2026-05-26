@@ -17,16 +17,17 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {DEVICE}")
 
 # 数据集路径
-ESC50_PATH = r"D:\audioset_tagging_cnn\data\ESC-50-master"
+US8K_PATH = r"D:\audioset_tagging_cnn\data\UrbanSound8K"
 
 # 加载标注
-metadata = pd.read_csv(os.path.join(ESC50_PATH, 'meta', 'esc50.csv'))
-train_meta = metadata[metadata['fold'] < 5]
-val_meta = metadata[metadata['fold'] == 5]
+metadata = pd.read_csv(os.path.join(US8K_PATH, 'metadata', 'UrbanSound8K.csv'))
+CSV_PATH = os.path.join(US8K_PATH, 'metadata', 'UrbanSound8K.csv')
+metadata = pd.read_csv(CSV_PATH)
+AUDIO_DIR = os.path.join(US8K_PATH, 'audio')
+train_meta = metadata[metadata['fold'] != 10].reset_index(drop=True)
+val_meta = metadata[metadata['fold'] == 10].reset_index(drop=True)
 
-classes = sorted(train_meta['category'].unique())
-class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
-NUM_CLASSES = len(classes)
+NUM_CLASSES = 10#类别数量
 print(f"Number of classes: {NUM_CLASSES}")
 
 # 参数
@@ -71,11 +72,10 @@ def preprocess_audio_for_model(audio_path, sample_rate=32000, n_fft=1024,
     return log_mel
 
 # ========== 数据集类 ==========
-class ESC50Dataset(Dataset):
-    def __init__(self, metadata, class_to_idx, esc50_path, is_training=True):
+class UrbanSound8KDataset(Dataset):
+    def __init__(self, metadata, audio_dir, is_training=True):
         self.metadata = metadata
-        self.class_to_idx = class_to_idx
-        self.audio_dir = os.path.join(esc50_path, 'audio')
+        self.audio_dir = audio_dir
         self.is_training = is_training  # 新增：区分训练集和验证集
 
     def __len__(self):
@@ -83,33 +83,24 @@ class ESC50Dataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.metadata.iloc[idx]
-        audio_path = os.path.join(self.audio_dir, row['filename'])
+        fold = f"fold{row['fold']}"
+        audio_path = os.path.join(self.audio_dir, fold, row['slice_file_name'])
         
          # 加载音频
         y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
 
-        # ========== 数据增强（只在训练时做）==========
-        if self.is_training:
-            # 1. 加高斯噪声（模拟背景噪音）
-            noise_level = np.random.uniform(0, 0.01)  # 随机噪声强度
-            noise = np.random.randn(len(y)) * noise_level
-            y = y + noise
-            
-            # 2. 时间拉伸（随机 0.9-1.1 倍速）
-            stretch_rate = np.random.uniform(0.9, 1.1)
-            y = librosa.effects.time_stretch(y, rate=stretch_rate)
-            
-            # 3. 音量调整（随机 0.7-1.3 倍）
-            volume_gain = np.random.uniform(0.7, 1.3)
-            y = y * volume_gain
-        # ========================================
-
-         # 统一长度到 5 秒
-        target_len = 5 * SAMPLE_RATE
+         # 统一长度到 4 秒
+        target_len = 4 * SAMPLE_RATE
         if len(y) < target_len:
             y = np.pad(y, (0, target_len - len(y)))
         else:
             y = y[:target_len]
+
+            # 数据增强
+        if self.is_training:
+            # 加噪声
+            noise = np.random.randn(len(y)) * 0.005
+            y = y + noise
         
         # 计算梅尔频谱
         mel_spec = librosa.feature.melspectrogram(
@@ -128,12 +119,12 @@ class ESC50Dataset(Dataset):
         # 转换为 Tensor
         log_mel = torch.from_numpy(log_mel).float()
         
-        label = self.class_to_idx[row['category']]
+        label = row['classID']
         return log_mel, label
 
 # 创建数据集和数据加载器
-train_dataset = ESC50Dataset(train_meta, class_to_idx, ESC50_PATH, is_training=True)
-val_dataset = ESC50Dataset(val_meta, class_to_idx, ESC50_PATH, is_training=False)
+train_dataset = UrbanSound8KDataset(train_meta, AUDIO_DIR, is_training=True)
+val_dataset = UrbanSound8KDataset(val_meta, AUDIO_DIR, is_training=False)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)

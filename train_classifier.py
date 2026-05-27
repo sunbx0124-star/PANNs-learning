@@ -12,7 +12,7 @@ from mymodels import Cnn14_4blocks
 BATCH_SIZE = 16
 LEARNING_RATE = 0.001
 # ==========训练轮数 ==========
-NUM_EPOCHS = 40
+NUM_EPOCHS = 60
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {DEVICE}")
 
@@ -181,8 +181,8 @@ optimizer = optim.Adam([
     {'params': model.conv_block2.parameters(), 'lr': 1e-5},   # 底层：最小学习率
     {'params': model.conv_block3.parameters(), 'lr': 5e-5},   # 中层：中等学习率
     {'params': model.conv_block4.parameters(), 'lr': 1e-4},   # 高层：较大学习率
-    {'params': model.fc1.parameters(), 'lr': 1e-3},           # 分类层：最大学习率
-    {'params': model.fc_audioset.parameters(), 'lr': 1e-3},
+    {'params': model.fc1.parameters(), 'lr': 5e-4},           # 分类层：最大学习率
+    {'params': model.fc_audioset.parameters(), 'lr': 5e-4},
 ], lr=1e-4)  # 默认学习率作为后备
 criterion = nn.CrossEntropyLoss()
 

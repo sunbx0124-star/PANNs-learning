@@ -32,9 +32,9 @@ print(f"Number of classes: {NUM_CLASSES}")
 
 # 参数
 SAMPLE_RATE = 32000
-N_FFT = 1024
-HOP_LENGTH = 320
-N_MELS = 64
+N_FFT = 2048
+HOP_LENGTH = 512
+N_MELS = 128
 FMIN = 50
 FMAX = 14000
 
@@ -218,5 +218,5 @@ for epoch in range(NUM_EPOCHS):
     print(f'Epoch {epoch+1} Validation Acc: {100*correct/total:.2f}%')
 
 # 保存模型
-torch.save(model.state_dict(), "esc50_final.pth")
-print("Training complete! Model saved as esc50_final.pth")
+torch.save(model.state_dict(), "UrbanSound8k_final.pth")
+print("Training complete! Model saved as UrbanSound8k_final.pth")

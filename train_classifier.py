@@ -12,7 +12,7 @@ from mymodels import Cnn14_4blocks
 BATCH_SIZE = 16
 LEARNING_RATE = 0.001
 # ==========训练轮数 ==========
-NUM_EPOCHS = 60
+NUM_EPOCHS = 20
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {DEVICE}")
 
